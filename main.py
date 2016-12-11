@@ -20,7 +20,7 @@ EMOTION_API_HEADER = {
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-SEND_MESSAGES ={
+SEND_MESSAGES = {
     "no_face": u"顔を認識出ませんでした…\U0001f62b",
     "no_good": u"点！笑えよベジータ\U0001f617",
     "good": u"点！なかなかいい笑顔だ\U0001f609",
@@ -31,12 +31,19 @@ SEND_MESSAGES ={
 
 
 def get_smile_score(message_id):
+    '''
+    Get smile face score from LINE content with Emotion API
+    @param message_id a LINE message id in a LINE webhook event
+    @return float smile score
+    '''
     # Get content from LINE
-    line_content_url = "https://api.line.me/v2/bot/message/" + message_id +"/content"
-    res_get_content = requests.get(line_content_url, headers=LINE_REQUEST_HEADER)
+    line_content_url = "https://api.line.me/v2/bot/message/" + message_id + "/content"
+    res_get_content = requests.get(
+        line_content_url, headers=LINE_REQUEST_HEADER)
 
     # Get smile score from Emotion API
-    res_get_e_score = requests.post(EMOTION_API_ENDPOINT, headers=EMOTION_API_HEADER, data=res_get_content.content)
+    res_get_e_score = requests.post(
+        EMOTION_API_ENDPOINT, headers=EMOTION_API_HEADER, data=res_get_content.content)
     logger.debug(res_get_e_score.json())
 
     if not res_get_e_score.status_code == 200:
@@ -46,7 +53,8 @@ def get_smile_score(message_id):
     if not e_scores == []:
         smile_score = 0.0
         for score in e_scores:
-            smile_score = float(smile_score) + float(score['scores']['happiness'])
+            smile_score = float(smile_score) + \
+                float(score['scores']['happiness'])
         smile_score_av = smile_score / len(e_scores)
         return smile_score_av
     else:
@@ -54,6 +62,10 @@ def get_smile_score(message_id):
 
 
 def reply_line_bot(webhook_event_object):
+    '''
+    Reply a LINE message for usage or a smile score of a face image
+    @param webhook_event_object dictionary of LINE webhook event object
+    '''
     logger.debug(webhook_event_object)
     send_text = ''
     reply_token = webhook_event_object['replyToken']
@@ -80,7 +92,7 @@ def reply_line_bot(webhook_event_object):
             else:
                 logger.error("Invalid smile_score: " + str(smile_score))
         elif msg_type == 'text':
-            if webhook_event_object['message']['text'] == "使い方":
+            if webhook_event_object['message']['text'].startswith("使い方"):
                 send_text = SEND_MESSAGES['usage']
     else:
         logger.info("no support event type: " + event_type)
@@ -98,7 +110,8 @@ def reply_line_bot(webhook_event_object):
     }
 
     if not send_text == '':
-        res = requests.post(LINE_REPLY_ENDPOINT,headers=LINE_REQUEST_HEADER, data=json.dumps(payload))
+        res = requests.post(
+            LINE_REPLY_ENDPOINT, headers=LINE_REQUEST_HEADER, data=json.dumps(payload))
         logger.debug(res)
         logger.debug(res.text)
 
