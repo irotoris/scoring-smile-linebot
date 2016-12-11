@@ -2,16 +2,17 @@
 import logging
 import requests
 import json
+import os
 from multiprocessing import Process
 
 LINE_REPLY_ENDPOINT = 'https://api.line.me/v2/bot/message/reply'
-LINE_CHANNEL_ACCESS_TOKEN = 'YOUR_ATTRIBUTE'
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv('LINE_CHANNEL_ACCESS_TOKEN')
 LINE_REQUEST_HEADER = {
     "Content-Type": "application/json",
     "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
 }
 EMOTION_API_ENDPOINT = 'https://api.projectoxford.ai/emotion/v1.0/recognize'
-EMOTION_API_SUBSCRIPTION_KEY = 'YOUR_ATTRIBUTE'
+EMOTION_API_SUBSCRIPTION_KEY = os.getenv('EMOTION_API_SUBSCRIPTION_KEY')
 EMOTION_API_HEADER = {
     "Content-Type": "application/octet-stream",
     "Ocp-Apim-Subscription-Key": EMOTION_API_SUBSCRIPTION_KEY
@@ -54,28 +55,37 @@ def get_smile_score(message_id):
 
 def reply_line_bot(webhook_event_object):
     logger.debug(webhook_event_object)
-    msg_id = webhook_event_object['message']['id']
-    msg_type = webhook_event_object['message']['type']
-    reply_token = webhook_event_object['replyToken']
     send_text = ''
+    reply_token = webhook_event_object['replyToken']
+    event_type = webhook_event_object['type']
 
-    if msg_type == 'image':
-        smile_score = int(get_smile_score(msg_id) * 100)
-        if smile_score < 0:
-            send_text = SEND_MESSAGES['no_face']
-        elif smile_score <= 25:
-            send_text = str(smile_score) + SEND_MESSAGES['no_good']
-        elif smile_score <= 50:
-            send_text = str(smile_score) + SEND_MESSAGES['good']
-        elif smile_score <= 75:
-            send_text = str(smile_score) + SEND_MESSAGES['nice']
-        elif smile_score <= 100:
-            send_text = str(smile_score) + SEND_MESSAGES['great']
-        else:
-            logger.error("Invalid smile_score: " + str(smile_score))
-    elif msg_type == 'text':
-        if webhook_event_object['message']['text'] == "使い方":
-            send_text = SEND_MESSAGES['usage']
+    if event_type == 'follow' or event_type == 'join':
+        send_text = SEND_MESSAGES['usage']
+    elif event_type == 'message':
+        msg_id = webhook_event_object['message']['id']
+        msg_type = webhook_event_object['message']['type']
+
+        if msg_type == 'image':
+            smile_score = get_smile_score(msg_id)
+            if smile_score < 0:
+                send_text = SEND_MESSAGES['no_face']
+            elif smile_score <= 25:
+                send_text = str(smile_score) + SEND_MESSAGES['no_good']
+            elif smile_score <= 50:
+                send_text = str(smile_score) + SEND_MESSAGES['good']
+            elif smile_score <= 75:
+                send_text = str(smile_score) + SEND_MESSAGES['nice']
+            elif smile_score <= 100:
+                send_text = str(smile_score) + SEND_MESSAGES['great']
+            else:
+                logger.error("Invalid smile_score: " + str(smile_score))
+        elif msg_type == 'text':
+            if webhook_event_object['message']['text'] == "使い方":
+                send_text = SEND_MESSAGES['usage']
+    else:
+        logger.info("no support event type: " + event_type)
+
+    logger.debug("send_text: " + send_text)
 
     payload = {
         "replyToken": reply_token,
@@ -86,6 +96,7 @@ def reply_line_bot(webhook_event_object):
             }
         ]
     }
+
     if not send_text == '':
         res = requests.post(LINE_REPLY_ENDPOINT,headers=LINE_REQUEST_HEADER, data=json.dumps(payload))
         logger.debug(res)
