@@ -66,7 +66,7 @@ def reply_line_bot(webhook_event_object):
         msg_type = webhook_event_object['message']['type']
 
         if msg_type == 'image':
-            smile_score = get_smile_score(msg_id)
+            smile_score = round(get_smile_score(msg_id) * 100, 5)
             if smile_score < 0:
                 send_text = SEND_MESSAGES['no_face']
             elif smile_score <= 25:
